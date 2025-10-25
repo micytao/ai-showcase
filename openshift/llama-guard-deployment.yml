@@ -1,0 +1,180 @@
+# Prerequisites and Deployment Steps:
+#
+# 1. Create the namespace:
+#    oc create namespace llama-guard
+#
+# 2. Create docker-secret for pulling images from registry.redhat.io:
+#    oc create secret generic docker-secret --from-file=.dockercfg=$HOME/.config/containers/auth.json --type=kubernetes.io/dockercfg -n llama-guard
+#
+# 3. Update the HF_TOKEN in the Secret below (line 37) with your Hugging Face token
+#
+# 4. Ensure GPU time-slicing is configured (see gpu-time-slicing-config.yaml)
+#
+# 5. Deploy:
+#    oc apply -f openshift/llama-guard-deployment.yml
+#
+# Note: This deployment uses Llama-Guard-3-1B model with 50% GPU memory utilization
+#       to fit within shared GPU time-slicing constraints (~2-3 GiB)
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: llama-guard
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: llama-guard-cache
+  namespace: llama-guard
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 30Gi
+  storageClassName: gp3-csi
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hf-secret
+  namespace: llama-guard
+type: Opaque
+stringData:
+#  HF_TOKEN: "YOUR_HUGGINGFACE_TOKEN_HERE"  # Replace with your actual HF token
+  HF_TOKEN: "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"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llama-guard
+  namespace: llama-guard
+  labels:
+    app: llama-guard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: llama-guard
+  template:
+    metadata:
+      labels:
+        app: llama-guard
+    spec:
+      imagePullSecrets:
+        - name: docker-secret
+      volumes:
+        - name: cache-volume
+          persistentVolumeClaim:
+            claimName: llama-guard-cache
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: "8Gi"
+      serviceAccountName: default
+      containers:
+        - name: llama-guard
+          image: 'registry.redhat.io/rhaiis/vllm-cuda-rhel9:3.2.1'
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-secret
+                  key: HF_TOKEN
+            - name: HF_HUB_OFFLINE
+              value: '0'
+            - name: VLLM_NO_USAGE_STATS
+              value: '1'
+          command:
+            - python
+            - '-m'
+            - vllm.entrypoints.openai.api_server
+          args:
+            - '--port=8000'
+            - '--model=meta-llama/Llama-Guard-3-1B'
+            - '--tensor-parallel-size=1'
+            - '--gpu-memory-utilization=0.5'
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+          resources:
+            limits:
+              cpu: '16'
+              nvidia.com/gpu: '1'
+              memory: 48Gi
+            requests:
+              cpu: '4'
+              memory: 12Gi
+              nvidia.com/gpu: '1'
+          volumeMounts:
+            - name: cache-volume
+              mountPath: /opt/app-root/src/.cache
+            - name: shm
+              mountPath: /dev/shm
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llama-guard-service
+  namespace: llama-guard
+  labels:
+    app: llama-guard
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+      name: http
+  selector:
+    app: llama-guard
+
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: llama-guard-route
+  namespace: llama-guard
+  labels:
+    app: llama-guard
+spec:
+  port:
+    targetPort: http
+  to:
+    kind: Service
+    name: llama-guard-service
+    weight: 100
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+

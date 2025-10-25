@@ -105,7 +105,7 @@ For quick local testing:
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd rh126-demo
+   cd ai-showcase
    ```
 
 2. **Configure GPU Time-Slicing** (if not already configured)

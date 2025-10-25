@@ -1,0 +1,608 @@
+---
+# OpenShift Cluster Configuration
+# This file sets up:
+# 1. Node Feature Discovery (NFD) Operator
+# 2. NVIDIA GPU Operator with Time-Slicing Configuration
+#
+# Prerequisites:
+# - OpenShift 4.x cluster
+# - Node(s) with NVIDIA GPUs
+# - Cluster admin privileges
+#
+# Usage:
+#   oc apply -f openshift-cluster-config.yaml
+#
+# After applying, verify the installation with:
+#   oc get pods -n openshift-nfd
+#   oc get pods -n nvidia-gpu-operator
+#   oc get nodes -o json | jq '.items[].status.capacity | select(.["nvidia.com/gpu"] != null)'
+#
+# Expected result: nvidia.com/gpu should show "2" (or your configured replica count)
+
+---
+# Create namespace for Node Feature Discovery
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-nfd
+  labels:
+    name: openshift-nfd
+    openshift.io/cluster-monitoring: "true"
+
+---
+# Create OperatorGroup for NFD
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  generateName: openshift-nfd-
+  name: openshift-nfd
+  namespace: openshift-nfd
+spec:
+  targetNamespaces:
+  - openshift-nfd
+
+---
+# Subscribe to Node Feature Discovery Operator
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: nfd
+  namespace: openshift-nfd
+spec:
+  channel: "stable"
+  installPlanApproval: Automatic
+  name: nfd
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+
+---
+# ServiceAccount for the NFD operator readiness Job
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nfd-operator-waiter
+  namespace: openshift-nfd
+
+---
+# ClusterRole for checking NFD operator status and creating NodeFeatureDiscovery
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nfd-operator-waiter
+rules:
+- apiGroups: ["operators.coreos.com"]
+  resources: ["clusterserviceversions", "subscriptions"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["nfd.openshift.io"]
+  resources: ["nodefeaturediscoveries"]
+  verbs: ["create", "get", "list"]
+
+---
+# ClusterRoleBinding for the NFD ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nfd-operator-waiter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nfd-operator-waiter
+subjects:
+- kind: ServiceAccount
+  name: nfd-operator-waiter
+  namespace: openshift-nfd
+
+---
+# Job that waits for NFD operator installation and then creates NodeFeatureDiscovery instance
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nfd-operator-instance-waiter
+  namespace: openshift-nfd
+spec:
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app: nfd-operator-waiter
+    spec:
+      serviceAccountName: nfd-operator-waiter
+      restartPolicy: OnFailure
+      containers:
+      - name: waiter
+        image: registry.redhat.io/openshift4/ose-cli:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -e
+          
+          echo "Waiting for Node Feature Discovery Operator to be installed..."
+          
+          # Wait for the Subscription to be created
+          echo "Checking for Subscription..."
+          timeout=300
+          elapsed=0
+          while ! oc get subscription nfd -n openshift-nfd &>/dev/null; do
+            if [ $elapsed -ge $timeout ]; then
+              echo "Timeout waiting for Subscription to be created"
+              exit 1
+            fi
+            echo "Waiting for Subscription... (${elapsed}s/${timeout}s)"
+            sleep 5
+            elapsed=$((elapsed + 5))
+          done
+          echo "Subscription found!"
+          
+          # Wait for ClusterServiceVersion to reach Succeeded phase
+          echo "Waiting for ClusterServiceVersion to reach Succeeded phase..."
+          timeout=600
+          elapsed=0
+          while true; do
+            csv_name=$(oc get subscription nfd -n openshift-nfd -o jsonpath='{.status.currentCSV}' 2>/dev/null || echo "")
+            if [ -n "$csv_name" ]; then
+              csv_phase=$(oc get csv "$csv_name" -n openshift-nfd -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+              if [ "$csv_phase" = "Succeeded" ]; then
+                echo "ClusterServiceVersion $csv_name is in Succeeded phase!"
+                break
+              fi
+              echo "ClusterServiceVersion $csv_name phase: $csv_phase (${elapsed}s/${timeout}s)"
+            else
+              echo "Waiting for ClusterServiceVersion to be created... (${elapsed}s/${timeout}s)"
+            fi
+            
+            if [ $elapsed -ge $timeout ]; then
+              echo "Timeout waiting for ClusterServiceVersion to reach Succeeded phase"
+              exit 1
+            fi
+            sleep 10
+            elapsed=$((elapsed + 10))
+          done
+          
+          # Wait for operator pods to be running
+          echo "Waiting for NFD Operator controller pods to be running..."
+          timeout=300
+          elapsed=0
+          while true; do
+            ready_pods=$(oc get pods -n openshift-nfd -l control-plane=controller-manager --no-headers 2>/dev/null | grep -c "Running" || echo "0")
+            if [ "$ready_pods" -gt 0 ]; then
+              echo "NFD Operator controller pods are running!"
+              break
+            fi
+            
+            if [ $elapsed -ge $timeout ]; then
+              echo "Timeout waiting for NFD Operator pods to be running"
+              exit 1
+            fi
+            echo "Waiting for NFD Operator pods... (${elapsed}s/${timeout}s)"
+            sleep 10
+            elapsed=$((elapsed + 10))
+          done
+          
+          # Give the operator a few more seconds to fully initialize
+          echo "Waiting for operator to fully initialize..."
+          sleep 15
+          
+          # Check if NodeFeatureDiscovery instance already exists
+          if oc get nodefeaturediscovery nfd-instance -n openshift-nfd &>/dev/null; then
+            echo "NodeFeatureDiscovery 'nfd-instance' already exists. Skipping creation."
+            exit 0
+          fi
+          
+          # Create the NodeFeatureDiscovery instance
+          echo "Creating NodeFeatureDiscovery instance..."
+          oc create -f - <<'EOF'
+          kind: NodeFeatureDiscovery
+          apiVersion: nfd.openshift.io/v1
+          metadata:
+            name: nfd-instance
+            namespace: openshift-nfd
+          spec:
+            customConfig:
+              configData: |
+            operand:
+              imagePullPolicy: IfNotPresent
+              servicePort: 12000
+            workerConfig:
+              configData: |
+                core:
+                  sleepInterval: 60s
+                sources:
+                  pci:
+                    deviceClassWhitelist:
+                      - "0200"
+                      - "03"
+                      - "12"
+                    deviceLabelFields:
+                      - "vendor"
+          EOF
+          
+          echo "NodeFeatureDiscovery instance created successfully!"
+          echo "Node Feature Discovery installation is complete."
+
+---
+# Create namespace for GPU Operator
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nvidia-gpu-operator
+
+---
+# Create OperatorGroup for GPU Operator
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: gpu-operator-certified
+  namespace: nvidia-gpu-operator
+spec:
+  targetNamespaces:
+  - nvidia-gpu-operator
+
+---
+# Subscribe to NVIDIA GPU Operator
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: gpu-operator-certified
+  namespace: nvidia-gpu-operator
+spec:
+  channel: "stable"
+  installPlanApproval: Automatic
+  name: gpu-operator-certified
+  source: certified-operators
+  sourceNamespace: openshift-marketplace
+
+---
+# ConfigMap for GPU Time-Slicing Configuration
+# This configures each physical GPU to present as 2 virtual GPUs
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: time-slicing-config
+  namespace: nvidia-gpu-operator
+data:
+  any: |-
+    version: v1
+    flags:
+      migStrategy: "none"
+    sharing:
+      timeSlicing:
+        resources:
+        - name: nvidia.com/gpu
+          replicas: 2
+
+---
+# ServiceAccount for the operator readiness Job
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gpu-operator-waiter
+  namespace: nvidia-gpu-operator
+
+---
+# ClusterRole for checking operator status and creating ClusterPolicy
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gpu-operator-waiter
+rules:
+- apiGroups: ["operators.coreos.com"]
+  resources: ["clusterserviceversions", "subscriptions"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["nvidia.com"]
+  resources: ["clusterpolicies"]
+  verbs: ["create", "get", "list"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get"]
+
+---
+# ClusterRoleBinding for the ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gpu-operator-waiter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: gpu-operator-waiter
+subjects:
+- kind: ServiceAccount
+  name: gpu-operator-waiter
+  namespace: nvidia-gpu-operator
+
+---
+# ConfigMap containing the ClusterPolicy definition
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clusterpolicy-config
+  namespace: nvidia-gpu-operator
+data:
+  clusterpolicy.yaml: |
+    kind: ClusterPolicy
+    apiVersion: nvidia.com/v1
+    metadata:
+      name: gpu-cluster-policy
+    spec:
+      operator:
+        defaultRuntime: crio
+        use_ocp_driver_toolkit: true
+        initContainer: {}
+      sandboxWorkloads:
+        enabled: false
+        defaultWorkload: container
+      driver:
+        enabled: true
+        useNvidiaDriverCRD: false
+        kernelModuleType: auto
+        upgradePolicy:
+          autoUpgrade: true
+          drain:
+            deleteEmptyDir: false
+            enable: false
+            force: false
+            timeoutSeconds: 300
+          maxParallelUpgrades: 1
+          maxUnavailable: 25%
+          podDeletion:
+            deleteEmptyDir: false
+            force: false
+            timeoutSeconds: 300
+          waitForCompletion:
+            timeoutSeconds: 0
+        repoConfig:
+          configMapName: ''
+        certConfig:
+          name: ''
+        licensingConfig:
+          nlsEnabled: true
+          configMapName: ''
+        virtualTopology:
+          config: ''
+        kernelModuleConfig:
+          name: ''
+      dcgmExporter:
+        enabled: true
+        config:
+          name: ''
+        serviceMonitor:
+          enabled: true
+      dcgm:
+        enabled: true
+      daemonsets:
+        updateStrategy: RollingUpdate
+        rollingUpdate:
+          maxUnavailable: '1'
+      devicePlugin:
+        enabled: true
+        config:
+          name: time-slicing-config
+          default: any
+        mps:
+          root: /run/nvidia/mps
+      gfd:
+        enabled: true
+      migManager:
+        enabled: true
+      nodeStatusExporter:
+        enabled: true
+      mig:
+        strategy: single
+      toolkit:
+        enabled: true
+      validator:
+        plugin:
+          env: []
+      vgpuManager:
+        enabled: false
+      vgpuDeviceManager:
+        enabled: true
+      sandboxDevicePlugin:
+        enabled: true
+      vfioManager:
+        enabled: true
+      gds:
+        enabled: false
+      gdrcopy:
+        enabled: false
+
+---
+# Job that waits for operator installation and then creates ClusterPolicy
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gpu-operator-clusterpolicy-waiter
+  namespace: nvidia-gpu-operator
+spec:
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app: gpu-operator-waiter
+    spec:
+      serviceAccountName: gpu-operator-waiter
+      restartPolicy: OnFailure
+      containers:
+      - name: waiter
+        image: registry.redhat.io/openshift4/ose-cli:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -e
+          
+          echo "Waiting for NVIDIA GPU Operator to be installed..."
+          
+          # Wait for the Subscription to be created
+          echo "Checking for Subscription..."
+          timeout=300
+          elapsed=0
+          while ! oc get subscription gpu-operator-certified -n nvidia-gpu-operator &>/dev/null; do
+            if [ $elapsed -ge $timeout ]; then
+              echo "Timeout waiting for Subscription to be created"
+              exit 1
+            fi
+            echo "Waiting for Subscription... (${elapsed}s/${timeout}s)"
+            sleep 5
+            elapsed=$((elapsed + 5))
+          done
+          echo "Subscription found!"
+          
+          # Wait for ClusterServiceVersion to reach Succeeded phase
+          echo "Waiting for ClusterServiceVersion to reach Succeeded phase..."
+          timeout=600
+          elapsed=0
+          while true; do
+            csv_name=$(oc get subscription gpu-operator-certified -n nvidia-gpu-operator -o jsonpath='{.status.currentCSV}' 2>/dev/null || echo "")
+            if [ -n "$csv_name" ]; then
+              csv_phase=$(oc get csv "$csv_name" -n nvidia-gpu-operator -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+              if [ "$csv_phase" = "Succeeded" ]; then
+                echo "ClusterServiceVersion $csv_name is in Succeeded phase!"
+                break
+              fi
+              echo "ClusterServiceVersion $csv_name phase: $csv_phase (${elapsed}s/${timeout}s)"
+            else
+              echo "Waiting for ClusterServiceVersion to be created... (${elapsed}s/${timeout}s)"
+            fi
+            
+            if [ $elapsed -ge $timeout ]; then
+              echo "Timeout waiting for ClusterServiceVersion to reach Succeeded phase"
+              exit 1
+            fi
+            sleep 10
+            elapsed=$((elapsed + 10))
+          done
+          
+          # Wait for operator pods to be running
+          echo "Waiting for GPU Operator controller pods to be running..."
+          timeout=300
+          elapsed=0
+          while true; do
+            ready_pods=$(oc get pods -n nvidia-gpu-operator -l app=gpu-operator --no-headers 2>/dev/null | grep -c "Running" || echo "0")
+            if [ "$ready_pods" -gt 0 ]; then
+              echo "GPU Operator controller pods are running!"
+              break
+            fi
+            
+            if [ $elapsed -ge $timeout ]; then
+              echo "Timeout waiting for GPU Operator pods to be running"
+              exit 1
+            fi
+            echo "Waiting for GPU Operator pods... (${elapsed}s/${timeout}s)"
+            sleep 10
+            elapsed=$((elapsed + 10))
+          done
+          
+          # Give the operator a few more seconds to fully initialize
+          echo "Waiting for operator to fully initialize..."
+          sleep 15
+          
+          # Check if ClusterPolicy already exists
+          if oc get clusterpolicy gpu-cluster-policy &>/dev/null; then
+            echo "ClusterPolicy 'gpu-cluster-policy' already exists. Skipping creation."
+            exit 0
+          fi
+          
+          # Create the ClusterPolicy
+          echo "Creating ClusterPolicy..."
+          oc create -f - <<'EOF'
+          kind: ClusterPolicy
+          apiVersion: nvidia.com/v1
+          metadata:
+            name: gpu-cluster-policy
+          spec:
+            operator:
+              defaultRuntime: crio
+              use_ocp_driver_toolkit: true
+              initContainer: {}
+            sandboxWorkloads:
+              enabled: false
+              defaultWorkload: container
+            driver:
+              enabled: true
+              useNvidiaDriverCRD: false
+              kernelModuleType: auto
+              upgradePolicy:
+                autoUpgrade: true
+                drain:
+                  deleteEmptyDir: false
+                  enable: false
+                  force: false
+                  timeoutSeconds: 300
+                maxParallelUpgrades: 1
+                maxUnavailable: 25%
+                podDeletion:
+                  deleteEmptyDir: false
+                  force: false
+                  timeoutSeconds: 300
+                waitForCompletion:
+                  timeoutSeconds: 0
+              repoConfig:
+                configMapName: ''
+              certConfig:
+                name: ''
+              licensingConfig:
+                nlsEnabled: true
+                configMapName: ''
+              virtualTopology:
+                config: ''
+              kernelModuleConfig:
+                name: ''
+            dcgmExporter:
+              enabled: true
+              config:
+                name: ''
+              serviceMonitor:
+                enabled: true
+            dcgm:
+              enabled: true
+            daemonsets:
+              updateStrategy: RollingUpdate
+              rollingUpdate:
+                maxUnavailable: '1'
+            devicePlugin:
+              enabled: true
+              config:
+                name: time-slicing-config
+                default: any
+              mps:
+                root: /run/nvidia/mps
+            gfd:
+              enabled: true
+            migManager:
+              enabled: true
+            nodeStatusExporter:
+              enabled: true
+            mig:
+              strategy: single
+            toolkit:
+              enabled: true
+            validator:
+              plugin:
+                env: []
+            vgpuManager:
+              enabled: false
+            vgpuDeviceManager:
+              enabled: true
+            sandboxDevicePlugin:
+              enabled: true
+            vfioManager:
+              enabled: true
+            gds:
+              enabled: false
+            gdrcopy:
+              enabled: false
+          EOF
+          
+          echo "ClusterPolicy created successfully!"
+          echo "GPU Operator installation with time-slicing is complete."
+

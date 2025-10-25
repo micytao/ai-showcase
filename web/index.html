@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Red Hat AI Showcase - Demo Platform</title>
-    <link rel="icon" type="image/png" href="../assets/redhat.png">
+    <link rel="icon" type="image/png" href="../assets/ai-showcase.png">
     <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600;700;900&family=Red+Hat+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -1155,6 +1155,7 @@
             align-items: center;
             justify-content: center;
             animation: fadeIn 0.3s ease;
+            padding: 2rem;
         }
 
         .modal-overlay.active {
@@ -1170,6 +1171,10 @@
             max-width: 500px;
             width: 90%;
             animation: slideUp 0.3s ease;
+            pointer-events: auto;
+            position: relative;
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .modal-header {
@@ -1215,6 +1220,7 @@
         .modal-body {
             color: var(--text-secondary);
         }
+
     </style>
 </head>
 <body>
@@ -1232,6 +1238,10 @@
             <button class="header-btn" onclick="window.open('https://github.com/rh-ai-quickstart', '_blank')">
                 <i class="fas fa-book"></i>
                 AI Quickstart
+            </button>
+            <button class="header-btn" id="settingsToggle" onclick="loadDemo('settings', event)">
+                <i class="fas fa-cog"></i>
+                Settings
             </button>
             <button class="header-btn" id="aboutToggle" onclick="openAboutModal()">
                 <i class="fas fa-info-circle"></i>
@@ -1258,6 +1268,10 @@
                 <a href="#" class="nav-item active" onclick="showHome(event)" data-title="Home">
                     <i class="fas fa-home nav-icon"></i>
                     <span>Home</span>
+                </a>
+                <a href="#" class="nav-item" onclick="loadDemo('settings', event)" data-title="Settings">
+                    <i class="fas fa-cog nav-icon"></i>
+                    <span>Settings</span>
                 </a>
                 <a href="#" class="nav-item" onclick="loadDemo('vlm', event)" data-title="Vision Language Model">
                     <i class="fas fa-video nav-icon"></i>
@@ -1713,6 +1727,9 @@
             } else if (demoId === 'retail-analytics') {
                 demoFrame.src = 'retail-analytics.html';
                 currentDemo = demoId;
+            } else if (demoId === 'settings') {
+                demoFrame.src = 'settings.html';
+                currentDemo = demoId;
             }
         }
 
@@ -1757,6 +1774,12 @@
             
             // Update button icon and text
             updateThemeButton(newTheme);
+            
+            // Broadcast theme change to iframes
+            const demoFrame = document.getElementById('demoFrame');
+            if (demoFrame && demoFrame.contentWindow) {
+                demoFrame.contentWindow.postMessage({ type: 'theme-changed', theme: newTheme }, '*');
+            }
         }
 
         function toggleSidebar() {
@@ -1865,6 +1888,7 @@
             document.documentElement.setAttribute('data-theme', savedTheme);
             updateThemeButton(savedTheme);
         }
+
 
         // About modal functions
         function openAboutModal() {
@@ -2048,11 +2072,12 @@
             console.log(`Filtering complete: ${visibleCount} demos visible`);
         }
 
-        // Close modal when clicking outside
-        document.addEventListener('click', (e) => {
+        // Close modal when clicking outside (on the overlay itself, not children)
+        document.addEventListener('mousedown', (e) => {
             const aboutModal = document.getElementById('aboutModal');
             
-            if (e.target === aboutModal) {
+            // Only close if clicking directly on the overlay, not its children
+            if (e.target === aboutModal && aboutModal.classList.contains('active')) {
                 closeAboutModal();
             }
         });
@@ -2077,11 +2102,39 @@
             }
         });
 
+        // Listen for messages from iframes (e.g., theme changes from settings.html)
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'theme-changed') {
+                const newTheme = event.data.theme;
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+                updateThemeButton(newTheme);
+                
+                // Broadcast to all iframes
+                const demoFrame = document.getElementById('demoFrame');
+                if (demoFrame && demoFrame.contentWindow) {
+                    demoFrame.contentWindow.postMessage({ type: 'theme-changed', theme: newTheme }, '*');
+                }
+            }
+        });
+
+        // Prevent modal content clicks from closing the modal
+        function preventModalClose() {
+            const aboutModalContent = document.querySelector('#aboutModal .modal-content');
+            
+            if (aboutModalContent) {
+                aboutModalContent.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                });
+            }
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             initTheme();
             loadVotes();
             sortDemosByVotes();
+            preventModalClose();
             console.log('Red Hat AI Showcase Platform Initialized');
         });
 
@@ -2100,4 +2153,5 @@
     </script>
 </body>
 </html>
+
 

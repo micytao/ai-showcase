@@ -2,29 +2,29 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: vlm-demo
+  name: ai-showcase
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vlm-demo-app
-  namespace: vlm-demo
+  name: ai-showcase-app
+  namespace: ai-showcase
   labels:
-    app: vlm-demo
+    app: ai-showcase
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: vlm-demo
+      app: ai-showcase
   template:
     metadata:
       labels:
-        app: vlm-demo
+        app: ai-showcase
     spec:
       containers:
       - name: web
-        image: quay.io/rh_ee_micyang/vlm-demo-rh126:0.1
+        image: quay.io/rh_ee_micyang/ai-showcase-amd:0.1
         imagePullPolicy: Always
         ports:
         - containerPort: 8000
@@ -62,13 +62,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: vlm-demo-service
-  namespace: vlm-demo
+  name: ai-showcase-service
+  namespace: ai-showcase
   labels:
-    app: vlm-demo
+    app: ai-showcase
 spec:
   selector:
-    app: vlm-demo
+    app: ai-showcase
   ports:
   - port: 8000
     targetPort: 8000
@@ -80,16 +80,16 @@ spec:
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: vlm-demo-route
-  namespace: vlm-demo
+  name: ai-showcase-route
+  namespace: ai-showcase
   labels:
-    app: vlm-demo
+    app: ai-showcase
 spec:
   port:
     targetPort: http
   to:
     kind: Service
-    name: vlm-demo-service
+    name: ai-showcase-service
     weight: 100
   tls:
     termination: edge

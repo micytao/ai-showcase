@@ -1,23 +1,23 @@
 #!/bin/bash
 
-# Undeploy VLM Demo from OpenShift
+# Undeploy AI Showcase from OpenShift
 # This script reverses the deployment process and cleans up all resources
 
 set -e
 
 # Configuration
-NAMESPACE="${NAMESPACE:-vlm-demo}"
+NAMESPACE="${NAMESPACE:-ai-showcase}"
 DELETE_NAMESPACE="${DELETE_NAMESPACE:-false}"
 
 echo "================================================"
-echo "VLM Demo - OpenShift Undeployment"
+echo "AI Showcase - OpenShift Undeployment"
 echo "================================================"
 echo ""
 echo "Configuration:"
 echo "  App Namespace:           $NAMESPACE"
 echo "  Delete Namespace:        $DELETE_NAMESPACE"
 echo ""
-echo "⚠️  WARNING: This will remove all VLM Demo resources from the cluster!"
+echo "⚠️  WARNING: This will remove all AI Showcase resources from the cluster!"
 echo ""
 
 # Check prerequisites
@@ -56,7 +56,7 @@ echo "✅ Namespace found: $NAMESPACE"
 
 # Confirm before proceeding
 echo ""
-read -p "Are you sure you want to undeploy VLM Demo from '$NAMESPACE'? (y/N): " -n 1 -r
+read -p "Are you sure you want to undeploy AI Showcase from '$NAMESPACE'? (y/N): " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "Undeployment cancelled."
@@ -66,9 +66,9 @@ fi
 # Delete route
 echo ""
 echo "Deleting route..."
-if oc get route vlm-demo-route -n $NAMESPACE &> /dev/null; then
-    oc delete route vlm-demo-route -n $NAMESPACE
-    echo "✅ Route deleted: vlm-demo-route"
+if oc get route ai-showcase-route -n $NAMESPACE &> /dev/null; then
+    oc delete route ai-showcase-route -n $NAMESPACE
+    echo "✅ Route deleted: ai-showcase-route"
 else
     echo "  Route not found, skipping"
 fi
@@ -76,9 +76,9 @@ fi
 # Delete service
 echo ""
 echo "Deleting service..."
-if kubectl get svc vlm-demo-service -n $NAMESPACE &> /dev/null; then
-    kubectl delete svc vlm-demo-service -n $NAMESPACE
-    echo "✅ Service deleted: vlm-demo-service"
+if kubectl get svc ai-showcase-service -n $NAMESPACE &> /dev/null; then
+    kubectl delete svc ai-showcase-service -n $NAMESPACE
+    echo "✅ Service deleted: ai-showcase-service"
 else
     echo "  Service not found, skipping"
 fi
@@ -86,13 +86,13 @@ fi
 # Delete deployment
 echo ""
 echo "Deleting deployment..."
-if kubectl get deployment vlm-demo-app -n $NAMESPACE &> /dev/null; then
-    kubectl delete deployment vlm-demo-app -n $NAMESPACE
-    echo "✅ Deployment deleted: vlm-demo-app"
+if kubectl get deployment ai-showcase-app -n $NAMESPACE &> /dev/null; then
+    kubectl delete deployment ai-showcase-app -n $NAMESPACE
+    echo "✅ Deployment deleted: ai-showcase-app"
     
     # Wait for pods to terminate
     echo "  Waiting for pods to terminate..."
-    kubectl wait --for=delete pod -l app=vlm-demo -n $NAMESPACE --timeout=120s 2>/dev/null || true
+    kubectl wait --for=delete pod -l app=ai-showcase -n $NAMESPACE --timeout=120s 2>/dev/null || true
     echo "  Pods terminated"
 else
     echo "  Deployment not found, skipping"
@@ -121,9 +121,9 @@ echo "Undeployment Successful! ✅"
 echo "================================================"
 echo ""
 echo "Resources removed:"
-echo "  ✓ Route:      vlm-demo-route"
-echo "  ✓ Service:    vlm-demo-service"
-echo "  ✓ Deployment: vlm-demo-app"
+echo "  ✓ Route:      ai-showcase-route"
+echo "  ✓ Service:    ai-showcase-service"
+echo "  ✓ Deployment: ai-showcase-app"
 if [[ "$DELETE_NAMESPACE" == "true" ]]; then
     echo "  ✓ Namespace:  $NAMESPACE"
 else
