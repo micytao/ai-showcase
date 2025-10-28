@@ -1,22 +1,22 @@
 #!/bin/bash
 
-# Deploy VLM Demo to OpenShift with vLLM
+# Deploy AI Showcase to OpenShift with vLLM
 # This script automates the deployment process using container image
 
 set -e
 
 # Configuration
-NAMESPACE="${NAMESPACE:-vlm-demo}"
+NAMESPACE="${NAMESPACE:-ai-showcase}"
 VLLM_NAMESPACE="${VLLM_NAMESPACE:-rhaiis}"
 VLLM_SERVICE="${VLLM_SERVICE:-rhaiis-service}"
 VLLM_PORT="${VLLM_PORT:-8000}"
 LLAMA_GUARD_NAMESPACE="${LLAMA_GUARD_NAMESPACE:-llama-guard}"
 LLAMA_GUARD_SERVICE="${LLAMA_GUARD_SERVICE:-llama-guard-service}"
 LLAMA_GUARD_PORT="${LLAMA_GUARD_PORT:-8000}"
-CONTAINER_IMAGE="${CONTAINER_IMAGE:-quay.io/rh_ee_micyang/vlm-demo-rh126:0.1}"
+CONTAINER_IMAGE="${CONTAINER_IMAGE:-quay.io/rh_ee_micyang/ai-showcase-amd:0.1}"
 
 echo "================================================"
-echo "VLM Demo - OpenShift Deployment"
+echo "AI Showcase - OpenShift Deployment"
 echo "================================================"
 echo ""
 echo "Configuration:"
@@ -99,19 +99,19 @@ cat <<EOF | oc apply -f -
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vlm-demo-app
+  name: ai-showcase-app
   namespace: $NAMESPACE
   labels:
-    app: vlm-demo
+    app: ai-showcase
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: vlm-demo
+      app: ai-showcase
   template:
     metadata:
       labels:
-        app: vlm-demo
+        app: ai-showcase
     spec:
       containers:
       - name: web
@@ -157,13 +157,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: vlm-demo-service
+  name: ai-showcase-service
   namespace: $NAMESPACE
   labels:
-    app: vlm-demo
+    app: ai-showcase
 spec:
   selector:
-    app: vlm-demo
+    app: ai-showcase
   ports:
   - port: 8000
     targetPort: 8000
@@ -177,28 +177,28 @@ echo "✅ Deployment created"
 # Create route
 echo ""
 echo "Creating route..."
-oc create route edge vlm-demo-route \
-  --service=vlm-demo-service \
+oc create route edge ai-showcase-route \
+  --service=ai-showcase-service \
   --port=8000 \
   --namespace=$NAMESPACE \
   --insecure-policy=Redirect \
   2>/dev/null || echo "  Route already exists, updating..."
 
-oc patch route vlm-demo-route -n $NAMESPACE -p '{"spec":{"port":{"targetPort":"http"},"tls":{"termination":"edge","insecureEdgeTerminationPolicy":"Redirect"}}}'
+oc patch route ai-showcase-route -n $NAMESPACE -p '{"spec":{"port":{"targetPort":"http"},"tls":{"termination":"edge","insecureEdgeTerminationPolicy":"Redirect"}}}'
 
 echo "✅ Route created"
 
 # Wait for deployment
 echo ""
 echo "Waiting for deployment to be ready..."
-kubectl wait --for=condition=available --timeout=120s deployment/vlm-demo-app -n $NAMESPACE
+kubectl wait --for=condition=available --timeout=120s deployment/ai-showcase-app -n $NAMESPACE
 
 # Force rollout to pull latest image
 echo ""
 echo "Forcing rollout to pull latest image..."
-oc rollout restart deployment/vlm-demo-app -n $NAMESPACE
+oc rollout restart deployment/ai-showcase-app -n $NAMESPACE
 sleep 5
-kubectl wait --for=condition=available --timeout=120s deployment/vlm-demo-app -n $NAMESPACE
+kubectl wait --for=condition=available --timeout=120s deployment/ai-showcase-app -n $NAMESPACE
 
 # Get route URL
 echo ""
@@ -206,7 +206,7 @@ echo "================================================"
 echo "Deployment Successful! 🎉"
 echo "================================================"
 echo ""
-ROUTE_URL=$(oc get route vlm-demo-route -n $NAMESPACE -o jsonpath='{.spec.host}')
+ROUTE_URL=$(oc get route ai-showcase-route -n $NAMESPACE -o jsonpath='{.spec.host}')
 echo "Application URL: https://$ROUTE_URL"
 echo ""
 echo "Next Steps:"
@@ -221,11 +221,11 @@ echo "  vLLM (Vision):    $VLLM_SERVICE.$VLLM_NAMESPACE:$VLLM_PORT"
 echo "  Llama Guard:      $LLAMA_GUARD_SERVICE.$LLAMA_GUARD_NAMESPACE:$LLAMA_GUARD_PORT"
 echo ""
 echo "Troubleshooting:"
-echo "  View web logs:        oc logs -f deployment/vlm-demo-app -n $NAMESPACE"
+echo "  View web logs:        oc logs -f deployment/ai-showcase-app -n $NAMESPACE"
 echo "  View vLLM logs:       oc logs -f deployment/rhaiis -n $VLLM_NAMESPACE"
 echo "  View guardrail logs:  oc logs -f deployment/llama-guard -n $LLAMA_GUARD_NAMESPACE"
 echo "  Check pods:           oc get pods -n $NAMESPACE"
-echo "  Describe:             oc describe deployment vlm-demo-app -n $NAMESPACE"
+echo "  Describe:             oc describe deployment ai-showcase-app -n $NAMESPACE"
 echo ""
 
 # Optional: Open in browser

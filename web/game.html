@@ -24,6 +24,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🎉 Red Hat Family Day 2025 - AI Vision Quest! 🎮</title>
+    <link rel="icon" type="image/png" href="../assets/ai-showcase.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fredoka:wght@300;400;500;600;700&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -2088,7 +2089,7 @@
                         RHAIIS vLLM Endpoint
                     </label>
                     <select id="vllmEndpointSelect" onchange="handleVllmEndpointChange()">
-                        <option value="https://rhaiis-route-rhaiis.apps.sno.sandbox73.opentlc.com">External Route (Default)</option>
+                        <option value="https://rhaiis-route-rhaiis.apps.cluster-pjc5d.pjc5d.sandbox1225.opentlc.com">External Route (Default)</option>
                         <option value="custom">Custom Endpoint...</option>
                     </select>
                     <div id="customVllmEndpointWrapper" style="display: none; margin-top: 0.5rem;">
@@ -2112,7 +2113,7 @@
                     </div>
                     <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-muted);">
                         💡 <strong>Enterprise Setup:</strong> Using Red Hat AI Inference Server (RHAIIS) with vLLM backend.<br>
-                        <strong>Default:</strong> Uses external route (rhaiis-route-rhaiis.apps.sno.sandbox73.opentlc.com)<br>
+                        <strong>Default:</strong> Uses external route (rhaiis-route-rhaiis.apps.cluster-pjc5d.pjc5d.sandbox1225.opentlc.com)<br>
                         <strong>Model:</strong> Qwen2-VL-2B-Instruct (Vision Language Model)<br>
                         <strong>API:</strong> OpenAI-compatible (Port 8000)
                     </div>
@@ -3413,7 +3414,7 @@
         // Smart API endpoint detection for RHAIIS/vLLM
         function getDefaultAPIEndpoint() {
             // Use external route endpoint
-            return "https://rhaiis-route-rhaiis.apps.sno.sandbox73.opentlc.com";
+            return "https://rhaiis-route-rhaiis.apps.cluster-pjc5d.pjc5d.sandbox1225.opentlc.com";
         }
         
         // Initialize endpoints with default external route

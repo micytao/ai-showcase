@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vision Language Model Demo - RHAIIS</title>
+    <link rel="icon" type="image/png" href="../assets/ai-showcase.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -1593,6 +1594,9 @@
                 <span>Red Hat One 26 demo - Team NASA</span>
             </div>
             <div class="header-actions">
+                <button class="theme-toggle" id="settingsToggle" title="Open Settings">
+                    <i class="fas fa-cog"></i>
+                </button>
                 <button class="theme-toggle" id="aboutToggle" title="About this project">
                     <i class="fas fa-info-circle"></i>
                 </button>
@@ -1674,7 +1678,8 @@
                     RHAIIS vLLM Endpoint
                 </label>
                 <select id="vllmEndpointSelect" onchange="handleVllmEndpointChange()">
-                    <option value="https://rhaiis-route-rhaiis.apps.sno.sandbox73.opentlc.com">External Route (Default)</option>
+                    <option value="https://rhaiis-route-rhaiis.apps.cluster-pjc5d.pjc5d.sandbox1225.opentlc.com">Embedded Model (Default)</option>
+                    <option value="maas">MaaS (Configured Models)</option>
                     <option value="custom">Custom Endpoint...</option>
                 </select>
                 <div id="customVllmEndpointWrapper" style="display: none; margin-top: 0.5rem;">
@@ -1696,9 +1701,27 @@
                         </select>
                     </div>
                 </div>
+                <div id="maasVllmEndpointWrapper" style="display: none; margin-top: 0.5rem;">
+                    <div class="input-wrapper">
+                        <select id="maasModelSelect" onchange="handleMaasModelSelection()">
+                            <option value="">-- Select a configured model --</option>
+                        </select>
+                    </div>
+                    <div id="maasModelInfo" style="display: none; margin-top: 0.5rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-color); font-size: 0.875rem;">
+                        <div style="color: var(--text-primary); font-weight: 600; margin-bottom: 0.5rem;">
+                            <i class="fas fa-info-circle"></i> Selected Model Details
+                        </div>
+                        <div style="color: var(--text-secondary);">
+                            <strong>Name:</strong> <span id="maasModelName">-</span><br>
+                            <strong>Endpoint:</strong> <span id="maasModelEndpoint">-</span><br>
+                            <strong>Model:</strong> <span id="maasModelId">-</span><br>
+                            <strong>Status:</strong> <span id="maasModelStatus" style="color: var(--success-color);">✓ Tested Successfully</span>
+                        </div>
+                    </div>
+                </div>
                 <div class="enterprise-info">
                     <strong>🏢 Enterprise Setup:</strong> Using Red Hat AI Inference Server (RHAIIS) with vLLM backend.<br>
-                    <strong>Default:</strong> Uses external route (rhaiis-route-rhaiis.apps.sno.sandbox73.opentlc.com)<br>
+                    <strong>Default:</strong> Uses embedded model (rhaiis-route-rhaiis.apps.cluster-pjc5d.pjc5d.sandbox1225.opentlc.com)<br>
                     <strong>Model:</strong> Qwen2-VL-2B-Instruct (Vision Language Model)<br>
                     <strong>API:</strong> OpenAI-compatible (Port 8000)
                 </div>
@@ -1800,7 +1823,8 @@
                     Guardrail Endpoint
                 </label>
                 <select id="guardrailEndpointSelect" onchange="handleGuardrailEndpointChange()">
-                    <option value="https://llama-guard-route-llama-guard.apps.sno.sandbox73.opentlc.com">External Route (Default)</option>
+                    <option value="https://llama-guard-route-llama-guard.apps.cluster-pjc5d.pjc5d.sandbox1225.opentlc.com">Embedded Model (Default)</option>
+                    <option value="maas">MaaS (Configured Models)</option>
                     <option value="custom">Custom Endpoint...</option>
                 </select>
                 <div id="customGuardrailEndpointWrapper" style="display: none; margin-top: 0.5rem;">
@@ -1822,6 +1846,24 @@
                         </select>
                     </div>
                 </div>
+                <div id="maasGuardrailEndpointWrapper" style="display: none; margin-top: 0.5rem;">
+                    <div class="input-wrapper">
+                        <select id="maasGuardrailSelect" onchange="handleMaasGuardrailSelection()">
+                            <option value="">-- Select a configured guardrail --</option>
+                        </select>
+                    </div>
+                    <div id="maasGuardrailInfo" style="display: none; margin-top: 0.5rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-color); font-size: 0.875rem;">
+                        <div style="color: var(--text-primary); font-weight: 600; margin-bottom: 0.5rem;">
+                            <i class="fas fa-info-circle"></i> Selected Guardrail Details
+                        </div>
+                        <div style="color: var(--text-secondary);">
+                            <strong>Name:</strong> <span id="maasGuardrailName">-</span><br>
+                            <strong>Endpoint:</strong> <span id="maasGuardrailEndpoint">-</span><br>
+                            <strong>Model:</strong> <span id="maasGuardrailModelId">-</span><br>
+                            <strong>Status:</strong> <span id="maasGuardrailStatus" style="color: var(--success-color);">✓ Tested Successfully</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="control-group">
@@ -1838,7 +1880,7 @@
 
             <div class="guardrail-info">
                 <strong>🛡️ Guardrail Model:</strong> Llama-Guard-3-1B (Content safety detection)<br>
-                <strong>Default:</strong> Uses external route (llama-guard-route-llama-guard.apps.sno.sandbox73.opentlc.com)<br>
+                <strong>Default:</strong> Uses embedded model (llama-guard-route-llama-guard.apps.cluster-pjc5d.pjc5d.sandbox1225.opentlc.com)<br>
                 <strong>Detection:</strong> Inappropriate, harmful, or offensive content<br>
                 <strong>Action:</strong> Highlights flagged content in responses
             </div>
@@ -2118,6 +2160,7 @@
         const guardrailEnabled = document.getElementById('guardrailEnabled');
         const themeToggle = document.getElementById('themeToggle');
         const aboutToggle = document.getElementById('aboutToggle');
+        const settingsToggle = document.getElementById('settingsToggle');
         
         // Image upload elements
         const webcamModeBtn = document.getElementById('webcamModeBtn');
@@ -2139,12 +2182,12 @@
         // Smart API endpoint detection for RHAIIS/vLLM
         function getDefaultAPIEndpoint() {
             // Use external route endpoint
-            return "https://rhaiis-route-rhaiis.apps.sno.sandbox73.opentlc.com";
+            return "https://rhaiis-route-rhaiis.apps.cluster-pjc5d.pjc5d.sandbox1225.opentlc.com";
         }
 
         function getDefaultGuardrailEndpoint() {
             // Use external route endpoint
-            return "https://llama-guard-route-llama-guard.apps.sno.sandbox73.opentlc.com";
+            return "https://llama-guard-route-llama-guard.apps.cluster-pjc5d.pjc5d.sandbox1225.opentlc.com";
         }
         
         // Initialize endpoints with default external routes
@@ -2300,19 +2343,26 @@
         function handleVllmEndpointChange() {
             const select = document.getElementById('vllmEndpointSelect');
             const customWrapper = document.getElementById('customVllmEndpointWrapper');
+            const maasWrapper = document.getElementById('maasVllmEndpointWrapper');
             const baseURLInput = document.getElementById('baseURL');
+            
+            // Hide both wrappers first
+            customWrapper.style.display = 'none';
+            maasWrapper.style.display = 'none';
             
             if (select.value === 'custom') {
                 customWrapper.style.display = 'block';
                 baseURLInput.focus();
+            } else if (select.value === 'maas') {
+                maasWrapper.style.display = 'block';
+                loadMaasModels();
             } else {
-                customWrapper.style.display = 'none';
                 baseURLInput.value = select.value;
                 
                 // Update status message
                 if (stream) {
-                    updateStatus('ready', 'Camera ready - Using external route', 'check-circle');
-                    setResponseText(`Camera access granted. Using external route.\nReady to start processing with VLM.`);
+                    updateStatus('ready', 'Camera ready - Using embedded model', 'check-circle');
+                    setResponseText(`Camera access granted. Using embedded model.\nReady to start processing with VLM.`);
                 }
             }
         }
@@ -2321,14 +2371,272 @@
         function handleGuardrailEndpointChange() {
             const select = document.getElementById('guardrailEndpointSelect');
             const customWrapper = document.getElementById('customGuardrailEndpointWrapper');
+            const maasWrapper = document.getElementById('maasGuardrailEndpointWrapper');
             const guardrailURLInput = document.getElementById('guardrailURL');
+            
+            // Hide both wrappers first
+            customWrapper.style.display = 'none';
+            maasWrapper.style.display = 'none';
             
             if (select.value === 'custom') {
                 customWrapper.style.display = 'block';
                 guardrailURLInput.focus();
+            } else if (select.value === 'maas') {
+                maasWrapper.style.display = 'block';
+                loadMaasGuardrails();
             } else {
-                customWrapper.style.display = 'none';
                 guardrailURLInput.value = select.value;
+                
+                // Update status message
+                updateGuardrailStatus('ready', 'Using embedded model', 'shield-alt');
+            }
+        }
+
+        // MaaS Model Management Functions
+        let selectedMaasConfig = null;
+        let selectedMaasGuardrailConfig = null;
+
+        // Load available MaaS models from settings
+        function loadMaasModels() {
+            const maasSelect = document.getElementById('maasModelSelect');
+            const maasInfo = document.getElementById('maasModelInfo');
+            
+            // Clear existing options except the first one
+            maasSelect.innerHTML = '<option value="">-- Select a configured model --</option>';
+            maasInfo.style.display = 'none';
+            selectedMaasConfig = null;
+            
+            // Load models from localStorage (from settings.html)
+            const models = [];
+            
+            // Load VLM endpoint
+            const vlmEndpoint = localStorage.getItem('vlmEndpoint');
+            const vlmApiKey = localStorage.getItem('vlmApiKey');
+            const vlmModel = localStorage.getItem('vlmModel');
+            
+            if (vlmEndpoint && vlmApiKey) {
+                models.push({
+                    id: 'vlm_primary',
+                    name: 'VLM Primary',
+                    endpoint: vlmEndpoint,
+                    apiKey: vlmApiKey,
+                    model: vlmModel || 'Qwen/Qwen2-VL-2B-Instruct',
+                    type: 'vlm'
+                });
+            }
+            
+            // Load custom endpoints
+            try {
+                const customEndpoints = JSON.parse(localStorage.getItem('customEndpoints') || '[]');
+                customEndpoints.forEach(endpoint => {
+                    const endpointUrl = localStorage.getItem(`${endpoint.id}Endpoint`) || endpoint.endpoint;
+                    const apiKey = localStorage.getItem(`${endpoint.id}ApiKey`) || endpoint.apiKey;
+                    const model = localStorage.getItem(`${endpoint.id}Model`) || '';
+                    
+                    if (endpointUrl && apiKey) {
+                        models.push({
+                            id: endpoint.id,
+                            name: endpoint.name,
+                            endpoint: endpointUrl,
+                            apiKey: apiKey,
+                            model: model,
+                            type: 'custom'
+                        });
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading custom endpoints:', error);
+            }
+            
+            // Populate dropdown
+            if (models.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'No configured models found - Configure in Settings';
+                option.disabled = true;
+                maasSelect.appendChild(option);
+                
+                updateStatus('error', 'No MaaS models configured', 'exclamation-triangle');
+                setResponseText('❌ No configured models found.\n\nPlease go to Settings and configure at least one model endpoint with API key and test it successfully.');
+                
+                // Add link to settings
+                const settingsLink = document.createElement('div');
+                settingsLink.style.cssText = 'margin-top: 0.5rem;';
+                settingsLink.innerHTML = '<a href="settings.html" target="_blank" style="color: var(--primary-color); text-decoration: underline;">Open Settings Page</a>';
+                maasSelect.parentElement.appendChild(settingsLink);
+            } else {
+                models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.id;
+                    option.textContent = `${model.name} (${model.model || 'Default Model'})`;
+                    option.dataset.config = JSON.stringify(model);
+                    maasSelect.appendChild(option);
+                });
+                
+                updateStatus('ready', `Found ${models.length} configured model(s)`, 'check-circle');
+                setResponseText(`✅ Found ${models.length} configured model(s).\n\nSelect a model from the dropdown to use it.`);
+            }
+            
+            console.log('📋 Loaded MaaS models:', models);
+        }
+
+        // Handle MaaS model selection
+        function handleMaasModelSelection() {
+            const maasSelect = document.getElementById('maasModelSelect');
+            const maasInfo = document.getElementById('maasModelInfo');
+            const selectedOption = maasSelect.options[maasSelect.selectedIndex];
+            
+            if (!selectedOption || !selectedOption.value) {
+                maasInfo.style.display = 'none';
+                selectedMaasConfig = null;
+                return;
+            }
+            
+            // Parse the configuration
+            try {
+                selectedMaasConfig = JSON.parse(selectedOption.dataset.config);
+                
+                // Update info display
+                document.getElementById('maasModelName').textContent = selectedMaasConfig.name;
+                document.getElementById('maasModelEndpoint').textContent = selectedMaasConfig.endpoint;
+                document.getElementById('maasModelId').textContent = selectedMaasConfig.model || 'Default Model';
+                maasInfo.style.display = 'block';
+                
+                // Apply the configuration
+                baseURL.value = selectedMaasConfig.endpoint;
+                
+                // Update status
+                updateStatus('ready', `Using ${selectedMaasConfig.name}`, 'check-circle');
+                setResponseText(`✅ Selected: ${selectedMaasConfig.name}\nEndpoint: ${selectedMaasConfig.endpoint}\nModel: ${selectedMaasConfig.model || 'Default'}\n\nReady to start processing with VLM.`);
+                
+                console.log('✅ Selected MaaS config:', selectedMaasConfig);
+            } catch (error) {
+                console.error('Error parsing MaaS config:', error);
+                updateStatus('error', 'Failed to load model config', 'exclamation-triangle');
+                setResponseText('❌ Error loading model configuration. Please try again or reconfigure in Settings.');
+                selectedMaasConfig = null;
+            }
+        }
+
+        // Load available MaaS guardrails from settings
+        function loadMaasGuardrails() {
+            const maasSelect = document.getElementById('maasGuardrailSelect');
+            const maasInfo = document.getElementById('maasGuardrailInfo');
+            
+            // Clear existing options except the first one
+            maasSelect.innerHTML = '<option value="">-- Select a configured guardrail --</option>';
+            maasInfo.style.display = 'none';
+            selectedMaasGuardrailConfig = null;
+            
+            // Load guardrails from localStorage (from settings.html)
+            const guardrails = [];
+            
+            // Load Guardrails endpoint
+            const guardrailsEndpoint = localStorage.getItem('guardrailsEndpoint');
+            const guardrailsApiKey = localStorage.getItem('guardrailsApiKey');
+            const guardrailsModel = localStorage.getItem('guardrailsModel');
+            
+            if (guardrailsEndpoint && guardrailsApiKey) {
+                guardrails.push({
+                    id: 'guardrails_primary',
+                    name: 'Guardrails Primary',
+                    endpoint: guardrailsEndpoint,
+                    apiKey: guardrailsApiKey,
+                    model: guardrailsModel || 'meta-llama/Llama-Guard-3-1B',
+                    type: 'guardrails'
+                });
+            }
+            
+            // Load custom endpoints that could be used as guardrails
+            try {
+                const customEndpoints = JSON.parse(localStorage.getItem('customEndpoints') || '[]');
+                customEndpoints.forEach(endpoint => {
+                    const endpointUrl = localStorage.getItem(`${endpoint.id}Endpoint`) || endpoint.endpoint;
+                    const apiKey = localStorage.getItem(`${endpoint.id}ApiKey`) || endpoint.apiKey;
+                    const model = localStorage.getItem(`${endpoint.id}Model`) || '';
+                    
+                    if (endpointUrl && apiKey) {
+                        guardrails.push({
+                            id: endpoint.id,
+                            name: endpoint.name,
+                            endpoint: endpointUrl,
+                            apiKey: apiKey,
+                            model: model,
+                            type: 'custom'
+                        });
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading custom endpoints for guardrails:', error);
+            }
+            
+            // Populate dropdown
+            if (guardrails.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'No configured guardrails found - Configure in Settings';
+                option.disabled = true;
+                maasSelect.appendChild(option);
+                
+                updateGuardrailStatus('error', 'No MaaS guardrails configured', 'exclamation-triangle');
+                guardrailResult.textContent = '❌ No configured guardrails found.\n\nPlease go to Settings and configure at least one guardrail endpoint with API key and test it successfully.';
+                
+                // Add link to settings
+                const settingsLink = document.createElement('div');
+                settingsLink.style.cssText = 'margin-top: 0.5rem;';
+                settingsLink.innerHTML = '<a href="settings.html" target="_blank" style="color: var(--primary-color); text-decoration: underline;">Open Settings Page</a>';
+                maasSelect.parentElement.appendChild(settingsLink);
+            } else {
+                guardrails.forEach(guardrail => {
+                    const option = document.createElement('option');
+                    option.value = guardrail.id;
+                    option.textContent = `${guardrail.name} (${guardrail.model || 'Default Model'})`;
+                    option.dataset.config = JSON.stringify(guardrail);
+                    maasSelect.appendChild(option);
+                });
+                
+                updateGuardrailStatus('ready', `Found ${guardrails.length} configured guardrail(s)`, 'check-circle');
+                guardrailResult.textContent = `✅ Found ${guardrails.length} configured guardrail(s).\n\nSelect a guardrail from the dropdown to use it.`;
+            }
+            
+            console.log('📋 Loaded MaaS guardrails:', guardrails);
+        }
+
+        // Handle MaaS guardrail selection
+        function handleMaasGuardrailSelection() {
+            const maasSelect = document.getElementById('maasGuardrailSelect');
+            const maasInfo = document.getElementById('maasGuardrailInfo');
+            const selectedOption = maasSelect.options[maasSelect.selectedIndex];
+            
+            if (!selectedOption || !selectedOption.value) {
+                maasInfo.style.display = 'none';
+                selectedMaasGuardrailConfig = null;
+                return;
+            }
+            
+            // Parse the configuration
+            try {
+                selectedMaasGuardrailConfig = JSON.parse(selectedOption.dataset.config);
+                
+                // Update info display
+                document.getElementById('maasGuardrailName').textContent = selectedMaasGuardrailConfig.name;
+                document.getElementById('maasGuardrailEndpoint').textContent = selectedMaasGuardrailConfig.endpoint;
+                document.getElementById('maasGuardrailModelId').textContent = selectedMaasGuardrailConfig.model || 'Default Model';
+                maasInfo.style.display = 'block';
+                
+                // Apply the configuration
+                guardrailURL.value = selectedMaasGuardrailConfig.endpoint;
+                
+                // Update status
+                updateGuardrailStatus('ready', `Using ${selectedMaasGuardrailConfig.name}`, 'check-circle');
+                guardrailResult.textContent = `✅ Selected: ${selectedMaasGuardrailConfig.name}\nEndpoint: ${selectedMaasGuardrailConfig.endpoint}\nModel: ${selectedMaasGuardrailConfig.model || 'Default'}\n\nReady to check content with guardrail.`;
+                
+                console.log('✅ Selected MaaS guardrail config:', selectedMaasGuardrailConfig);
+            } catch (error) {
+                console.error('Error parsing MaaS guardrail config:', error);
+                updateGuardrailStatus('error', 'Failed to load guardrail config', 'exclamation-triangle');
+                guardrailResult.textContent = '❌ Error loading guardrail configuration. Please try again or reconfigure in Settings.';
+                selectedMaasGuardrailConfig = null;
             }
         }
 
@@ -2425,6 +2733,13 @@
         // Get the selected model name
         function getSelectedModel() {
             const select = document.getElementById('vllmEndpointSelect');
+            
+            // If using MaaS and a model is selected, use it
+            if (select.value === 'maas' && selectedMaasConfig && selectedMaasConfig.model) {
+                console.log('📋 Using MaaS model:', selectedMaasConfig.model);
+                return selectedMaasConfig.model;
+            }
+            
             const modelSelect = document.getElementById('modelSelect');
             
             // If using custom endpoint and a model is selected, use it
@@ -2443,10 +2758,17 @@
                 'Accept': 'application/json',
             };
             
-            // Add API key if provided (for custom endpoints)
-            const apiKeyInput = document.getElementById('apiKey');
-            if (apiKeyInput && apiKeyInput.value.trim()) {
-                headers['Authorization'] = `Bearer ${apiKeyInput.value.trim()}`;
+            // Check if using MaaS model
+            const vllmSelect = document.getElementById('vllmEndpointSelect');
+            if (vllmSelect.value === 'maas' && selectedMaasConfig && selectedMaasConfig.apiKey) {
+                headers['Authorization'] = `Bearer ${selectedMaasConfig.apiKey}`;
+                console.log('🔑 Using MaaS API key for:', selectedMaasConfig.name);
+            } else {
+                // Add API key if provided (for custom endpoints)
+                const apiKeyInput = document.getElementById('apiKey');
+                if (apiKeyInput && apiKeyInput.value.trim()) {
+                    headers['Authorization'] = `Bearer ${apiKeyInput.value.trim()}`;
+                }
             }
             
             return headers;
@@ -2548,6 +2870,13 @@
         // Get the selected guardrail model name
         function getSelectedGuardrailModel() {
             const select = document.getElementById('guardrailEndpointSelect');
+            
+            // If using MaaS and a guardrail is selected, use it
+            if (select.value === 'maas' && selectedMaasGuardrailConfig && selectedMaasGuardrailConfig.model) {
+                console.log('📋 Using MaaS guardrail model:', selectedMaasGuardrailConfig.model);
+                return selectedMaasGuardrailConfig.model;
+            }
+            
             const modelSelect = document.getElementById('guardrailModelSelect');
             
             // If using custom endpoint and a model is selected, use it
@@ -2566,10 +2895,17 @@
                 'Accept': 'application/json',
             };
             
-            // Add API key if provided (for custom endpoints)
-            const apiKeyInput = document.getElementById('guardrailApiKey');
-            if (apiKeyInput && apiKeyInput.value.trim()) {
-                headers['Authorization'] = `Bearer ${apiKeyInput.value.trim()}`;
+            // Check if using MaaS guardrail
+            const guardrailSelect = document.getElementById('guardrailEndpointSelect');
+            if (guardrailSelect.value === 'maas' && selectedMaasGuardrailConfig && selectedMaasGuardrailConfig.apiKey) {
+                headers['Authorization'] = `Bearer ${selectedMaasGuardrailConfig.apiKey}`;
+                console.log('🔑 Using MaaS guardrail API key for:', selectedMaasGuardrailConfig.name);
+            } else {
+                // Add API key if provided (for custom endpoints)
+                const apiKeyInput = document.getElementById('guardrailApiKey');
+                if (apiKeyInput && apiKeyInput.value.trim()) {
+                    headers['Authorization'] = `Bearer ${apiKeyInput.value.trim()}`;
+                }
             }
             
             return headers;
@@ -4234,6 +4570,9 @@ Provide your safety assessment for User in the above conversation:
 
         themeToggle.addEventListener('click', toggleTheme);
         aboutToggle.addEventListener('click', openAboutModal);
+        settingsToggle.addEventListener('click', () => {
+            window.open('settings.html', '_blank');
+        });
 
         // Add fade-in animation to cards
         function addFadeInAnimation() {
@@ -4252,6 +4591,24 @@ Provide your safety assessment for User in the above conversation:
             setupDragAndDrop();
             addFadeInAnimation();
             loadCustomTemplates();
+        });
+
+        // Listen for settings updates from settings.html
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'settings-updated') {
+                console.log('📡 Settings updated - reloading MaaS models');
+                // If currently on MaaS mode, reload models
+                const vllmSelect = document.getElementById('vllmEndpointSelect');
+                if (vllmSelect.value === 'maas') {
+                    loadMaasModels();
+                }
+                
+                // Also reload guardrails if in MaaS mode
+                const guardrailSelect = document.getElementById('guardrailEndpointSelect');
+                if (guardrailSelect.value === 'maas') {
+                    loadMaasGuardrails();
+                }
+            }
         });
 
         // Cleanup when page is closed/navigated away

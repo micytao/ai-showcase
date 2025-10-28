@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Smart Retail Analytics - Heat Map Demo</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
+    <link rel="icon" type="image/png" href="../assets/ai-showcase.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -599,7 +599,8 @@
                         RHAIIS vLLM Endpoint
                     </label>
                     <select id="vllmEndpointSelect" class="form-input" onchange="handleVllmEndpointChange()">
-                        <option value="https://rhaiis-route-rhaiis.apps.sno.sandbox73.opentlc.com">External Route (Default)</option>
+                        <option value="https://rhaiis-route-rhaiis.apps.cluster-pjc5d.pjc5d.sandbox1225.opentlc.com">Embedded Model (Default)</option>
+                        <option value="maas">MaaS (Configured Models)</option>
                         <option value="custom">Custom Endpoint...</option>
                     </select>
                     <div id="customVllmEndpointWrapper" style="display: none; margin-top: 0.75rem;">
@@ -613,11 +614,27 @@
                             <option value="">Select a model (fetch models first)</option>
                         </select>
                     </div>
+                    <div id="maasVllmEndpointWrapper" style="display: none; margin-top: 0.75rem;">
+                        <select id="maasModelSelect" class="form-input" onchange="handleMaasModelSelection()" style="margin-bottom: 0.5rem;">
+                            <option value="">-- Select a configured model --</option>
+                        </select>
+                        <div id="maasModelInfo" style="display: none; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem; border: 1px solid var(--border-color); font-size: 0.8125rem;">
+                            <div style="color: var(--text-primary); font-weight: 600; margin-bottom: 0.5rem;">
+                                <i class="fas fa-info-circle"></i> Selected Model Details
+                            </div>
+                            <div style="color: var(--text-secondary);">
+                                <strong>Name:</strong> <span id="maasModelName">-</span><br>
+                                <strong>Endpoint:</strong> <span id="maasModelEndpoint">-</span><br>
+                                <strong>Model:</strong> <span id="maasModelId">-</span><br>
+                                <strong>Status:</strong> <span id="maasModelStatus" style="color: var(--success-color);">✓ Tested Successfully</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div style="background: linear-gradient(135deg, rgba(220, 38, 38, 0.1), rgba(239, 68, 68, 0.05)); border: 1px solid rgba(220, 38, 38, 0.2); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; font-size: 0.75rem; color: var(--text-secondary);">
                     <strong style="color: var(--primary-color);">🏢 Enterprise Setup:</strong> Using Red Hat AI Inference Server (RHAIIS) with vLLM backend.<br>
-                    <strong>Default:</strong> Uses external route (rhaiis-route-rhaiis.apps.sno.sandbox73.opentlc.com)<br>
+                    <strong>Default:</strong> Uses embedded model (rhaiis-route-rhaiis.apps.cluster-pjc5d.pjc5d.sandbox1225.opentlc.com)<br>
                     <strong>Model:</strong> Qwen2-VL-2B-Instruct (Vision Language Model)<br>
                     <strong>API:</strong> OpenAI-compatible (Port 8000)
                 </div>
@@ -738,7 +755,7 @@
 
         // Initialize endpoint with default
         function getDefaultAPIEndpoint() {
-            return "https://rhaiis-route-rhaiis.apps.sno.sandbox73.opentlc.com";
+            return "https://rhaiis-route-rhaiis.apps.cluster-pjc5d.pjc5d.sandbox1225.opentlc.com";
         }
         
         baseURL.value = getDefaultAPIEndpoint();
@@ -1095,14 +1112,135 @@
         function handleVllmEndpointChange() {
             const select = document.getElementById('vllmEndpointSelect');
             const customWrapper = document.getElementById('customVllmEndpointWrapper');
+            const maasWrapper = document.getElementById('maasVllmEndpointWrapper');
             const baseURLInput = document.getElementById('baseURL');
+            
+            // Hide both wrappers first
+            customWrapper.style.display = 'none';
+            maasWrapper.style.display = 'none';
             
             if (select.value === 'custom') {
                 customWrapper.style.display = 'block';
                 baseURLInput.focus();
+            } else if (select.value === 'maas') {
+                maasWrapper.style.display = 'block';
+                loadMaasModels();
             } else {
-                customWrapper.style.display = 'none';
                 baseURLInput.value = select.value;
+            }
+        }
+
+        // MaaS Model Management
+        let selectedMaasConfig = null;
+
+        // Load available MaaS models from settings
+        function loadMaasModels() {
+            const maasSelect = document.getElementById('maasModelSelect');
+            const maasInfo = document.getElementById('maasModelInfo');
+            
+            // Clear existing options except the first one
+            maasSelect.innerHTML = '<option value="">-- Select a configured model --</option>';
+            maasInfo.style.display = 'none';
+            selectedMaasConfig = null;
+            
+            // Load models from localStorage (from settings.html)
+            const models = [];
+            
+            // Load VLM endpoint
+            const vlmEndpoint = localStorage.getItem('vlmEndpoint');
+            const vlmApiKey = localStorage.getItem('vlmApiKey');
+            const vlmModel = localStorage.getItem('vlmModel');
+            
+            if (vlmEndpoint && vlmApiKey) {
+                models.push({
+                    id: 'vlm_primary',
+                    name: 'VLM Primary',
+                    endpoint: vlmEndpoint,
+                    apiKey: vlmApiKey,
+                    model: vlmModel || 'Qwen/Qwen2-VL-2B-Instruct',
+                    type: 'vlm'
+                });
+            }
+            
+            // Load custom endpoints
+            try {
+                const customEndpoints = JSON.parse(localStorage.getItem('customEndpoints') || '[]');
+                customEndpoints.forEach(endpoint => {
+                    const endpointUrl = localStorage.getItem(`${endpoint.id}Endpoint`) || endpoint.endpoint;
+                    const apiKey = localStorage.getItem(`${endpoint.id}ApiKey`) || endpoint.apiKey;
+                    const model = localStorage.getItem(`${endpoint.id}Model`) || '';
+                    
+                    if (endpointUrl && apiKey) {
+                        models.push({
+                            id: endpoint.id,
+                            name: endpoint.name,
+                            endpoint: endpointUrl,
+                            apiKey: apiKey,
+                            model: model,
+                            type: 'custom'
+                        });
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading custom endpoints:', error);
+            }
+            
+            // Populate dropdown
+            if (models.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'No configured models found - Configure in Settings';
+                option.disabled = true;
+                maasSelect.appendChild(option);
+                
+                addActivityLog('No MaaS models configured', 'error');
+            } else {
+                models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.id;
+                    option.textContent = `${model.name} (${model.model || 'Default Model'})`;
+                    option.dataset.config = JSON.stringify(model);
+                    maasSelect.appendChild(option);
+                });
+                
+                addActivityLog(`Found ${models.length} configured model(s)`, 'success');
+            }
+            
+            console.log('📋 Loaded MaaS models:', models);
+        }
+
+        // Handle MaaS model selection
+        function handleMaasModelSelection() {
+            const maasSelect = document.getElementById('maasModelSelect');
+            const maasInfo = document.getElementById('maasModelInfo');
+            const selectedOption = maasSelect.options[maasSelect.selectedIndex];
+            
+            if (!selectedOption || !selectedOption.value) {
+                maasInfo.style.display = 'none';
+                selectedMaasConfig = null;
+                return;
+            }
+            
+            // Parse the configuration
+            try {
+                selectedMaasConfig = JSON.parse(selectedOption.dataset.config);
+                
+                // Update info display
+                document.getElementById('maasModelName').textContent = selectedMaasConfig.name;
+                document.getElementById('maasModelEndpoint').textContent = selectedMaasConfig.endpoint;
+                document.getElementById('maasModelId').textContent = selectedMaasConfig.model || 'Default Model';
+                maasInfo.style.display = 'block';
+                
+                // Apply the configuration
+                baseURL.value = selectedMaasConfig.endpoint;
+                
+                addActivityLog(`Using ${selectedMaasConfig.name}`, 'success');
+                
+                console.log('✅ Selected MaaS config:', selectedMaasConfig);
+            } catch (error) {
+                console.error('Error parsing MaaS config:', error);
+                addActivityLog('Failed to load model config', 'error');
+                selectedMaasConfig = null;
             }
         }
 
@@ -1192,6 +1330,13 @@
         // Get the selected model name
         function getSelectedModel() {
             const select = document.getElementById('vllmEndpointSelect');
+            
+            // If using MaaS and a model is selected, use it
+            if (select.value === 'maas' && selectedMaasConfig && selectedMaasConfig.model) {
+                console.log('📋 Using MaaS model:', selectedMaasConfig.model);
+                return selectedMaasConfig.model;
+            }
+            
             const modelSelect = document.getElementById('modelSelect');
             
             // If using custom endpoint and a model is selected, use it
@@ -1210,10 +1355,18 @@
                 'Accept': 'application/json',
             };
             
-            // Add API key if provided (for custom endpoints)
-            const apiKeyInput = document.getElementById('apiKey');
-            if (apiKeyInput && apiKeyInput.value.trim()) {
-                headers['Authorization'] = `Bearer ${apiKeyInput.value.trim()}`;
+            const vllmSelect = document.getElementById('vllmEndpointSelect');
+            
+            // Use MaaS API key if MaaS is selected
+            if (vllmSelect.value === 'maas' && selectedMaasConfig && selectedMaasConfig.apiKey) {
+                headers['Authorization'] = `Bearer ${selectedMaasConfig.apiKey}`;
+                console.log('🔑 Using MaaS API key for:', selectedMaasConfig.name);
+            } else {
+                // Add API key if provided (for custom endpoints)
+                const apiKeyInput = document.getElementById('apiKey');
+                if (apiKeyInput && apiKeyInput.value.trim()) {
+                    headers['Authorization'] = `Bearer ${apiKeyInput.value.trim()}`;
+                }
             }
             
             return headers;
