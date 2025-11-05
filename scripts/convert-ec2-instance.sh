@@ -17,7 +17,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Default values
-TARGET_INSTANCE_TYPE="g6.8xlarge"
+TARGET_INSTANCE_TYPE="g6.8xlarge" # "g6.8xlarge" | "g4dn.xlarge"
 LIST_INSTANCES=false
 INTERACTIVE_MODE=false
 INITIAL_ARG_COUNT=$#
@@ -476,6 +476,39 @@ get_instance_name() {
     fi
 }
 
+# Function to check if instance type is available in region
+check_instance_type_availability() {
+    local instance_type=$1
+    
+    print_info "Checking if instance type '$instance_type' is available in region $REGION..."
+    
+    INSTANCE_TYPE_CHECK=$(aws ec2 describe-instance-type-offerings \
+        --region "$REGION" \
+        --filters "Name=instance-type,Values=$instance_type" \
+        --query 'InstanceTypeOfferings[0].InstanceType' \
+        --output text 2>&1)
+    
+    if [ $? -ne 0 ]; then
+        print_error "Failed to check instance type availability"
+        print_error "Debug Info:"
+        print_error "  Region: $REGION"
+        print_error "  Instance Type: $instance_type"
+        print_error "  AWS CLI Output: $INSTANCE_TYPE_CHECK"
+        return 1
+    fi
+    
+    if [ "$INSTANCE_TYPE_CHECK" == "None" ] || [ -z "$INSTANCE_TYPE_CHECK" ]; then
+        print_error "Instance type '$instance_type' is NOT available in region $REGION"
+        print_error "Debug Info:"
+        print_error "  You can check available instance types with:"
+        print_error "  aws ec2 describe-instance-type-offerings --region $REGION --filters \"Name=instance-type,Values=g6.*\" --query 'InstanceTypeOfferings[*].InstanceType' --output table"
+        return 1
+    fi
+    
+    print_success "Instance type '$instance_type' is available in region $REGION"
+    return 0
+}
+
 # Function to stop instance
 stop_instance() {
     local instance_id=$1
@@ -630,6 +663,13 @@ process_instance() {
         fi
     else
         print_warn "Conversion needed: $CURRENT_TYPE -> $target_type"
+        echo ""
+        
+        # Check if target instance type is available in the region BEFORE stopping
+        if ! check_instance_type_availability "$target_type"; then
+            print_error "Cannot proceed with conversion. Instance type not available."
+            return 1
+        fi
         echo ""
         
         # Stop instance if running
