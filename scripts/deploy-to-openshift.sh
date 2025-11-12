@@ -13,7 +13,7 @@ VLLM_PORT="${VLLM_PORT:-8000}"
 LLAMA_GUARD_NAMESPACE="${LLAMA_GUARD_NAMESPACE:-llama-guard}"
 LLAMA_GUARD_SERVICE="${LLAMA_GUARD_SERVICE:-llama-guard-service}"
 LLAMA_GUARD_PORT="${LLAMA_GUARD_PORT:-8000}"
-CONTAINER_IMAGE="${CONTAINER_IMAGE:-quay.io/rh_ee_micyang/ai-showcase-amd:0.1}"
+CONTAINER_IMAGE="${CONTAINER_IMAGE:-quay.io/rh_ee_micyang/ai-showcase-amd:0.2}"
 
 echo "================================================"
 echo "AI Showcase - OpenShift Deployment"
