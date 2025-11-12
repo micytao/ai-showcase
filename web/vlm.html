@@ -1597,9 +1597,6 @@
                 <button class="theme-toggle" id="settingsToggle" title="Open Settings">
                     <i class="fas fa-cog"></i>
                 </button>
-                <button class="theme-toggle" id="aboutToggle" title="About this project">
-                    <i class="fas fa-info-circle"></i>
-                </button>
                 <button class="theme-toggle" id="themeToggle" title="Toggle dark mode">
                     <i class="fas fa-moon"></i>
                 </button>
@@ -2093,56 +2090,6 @@
         </div>
     </div>
 
-    <!-- Modal for About -->
-    <div class="modal-overlay" id="aboutModal">
-        <div class="modal-content" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>
-                    <i class="fas fa-info-circle"></i>
-                    About This Project
-                </h3>
-                <button class="modal-close" onclick="closeAboutModal()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div style="text-align: center; margin-bottom: 1.5rem;">
-                    <h4 style="color: var(--primary-color); font-size: 1.25rem; margin-bottom: 0.5rem;">Red Hat One 26 Demo</h4>
-                    <p style="color: var(--text-secondary); margin: 0;">Vision Language Model with Guardrails</p>
-                </div>
-                
-                <div style="margin-bottom: 1.5rem;">
-                    <h4 style="color: var(--text-primary); font-size: 1.1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fas fa-users"></i>
-                        Team Members
-                    </h4>
-                    <div style="display: flex; flex-direction: column; gap: 1rem;">
-                        <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                            <img src="../assets/michael.png" alt="Michael Yang" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary-color);">
-                            <div style="flex: 1;">
-                                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Michael Yang</div>
-                                <div style="color: var(--text-secondary); font-size: 0.875rem;">Account Solution Architect</div>
-                            </div>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                            <img src="../assets/henrique.png" alt="Henrique Viecili" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary-color);">
-                            <div style="flex: 1;">
-                                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Henrique Viecili</div>
-                                <div style="color: var(--text-secondary); font-size: 0.875rem;">Account Solution Architect</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div style="text-align: center; padding-top: 1rem; border-top: 1px solid var(--border-color);">
-                    <p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0;">
-                        <i class="fas fa-rocket"></i> Team NASA
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script>
         const video = document.getElementById('videoFeed');
         const canvas = document.getElementById('canvas');
@@ -2159,7 +2106,6 @@
         const guardrailResult = document.getElementById('guardrailResult');
         const guardrailEnabled = document.getElementById('guardrailEnabled');
         const themeToggle = document.getElementById('themeToggle');
-        const aboutToggle = document.getElementById('aboutToggle');
         const settingsToggle = document.getElementById('settingsToggle');
         
         // Image upload elements
@@ -3045,16 +2991,6 @@
             closeConfirmationModal();
         }
 
-        // About modal functions
-        function openAboutModal() {
-            const modal = document.getElementById('aboutModal');
-            modal.classList.add('active');
-        }
-
-        function closeAboutModal() {
-            const modal = document.getElementById('aboutModal');
-            modal.classList.remove('active');
-        }
 
         function saveCustomTemplate() {
             const nameInput = document.getElementById('customTemplateName');
@@ -3122,7 +3058,6 @@
         document.addEventListener('click', (e) => {
             const addTemplateModal = document.getElementById('addTemplateModal');
             const confirmationModal = document.getElementById('confirmationModal');
-            const aboutModal = document.getElementById('aboutModal');
             
             if (e.target === addTemplateModal) {
                 closeAddTemplateModal();
@@ -3131,10 +3066,6 @@
             if (e.target === confirmationModal) {
                 closeConfirmationModal();
             }
-            
-            if (e.target === aboutModal) {
-                closeAboutModal();
-            }
         });
 
         // Close modal with Escape key
@@ -3142,14 +3073,11 @@
             if (e.key === 'Escape') {
                 const addTemplateModal = document.getElementById('addTemplateModal');
                 const confirmationModal = document.getElementById('confirmationModal');
-                const aboutModal = document.getElementById('aboutModal');
                 
                 if (addTemplateModal.classList.contains('active')) {
                     closeAddTemplateModal();
                 } else if (confirmationModal.classList.contains('active')) {
                     closeConfirmationModal();
-                } else if (aboutModal.classList.contains('active')) {
-                    closeAboutModal();
                 }
             }
         });
@@ -4569,7 +4497,6 @@ Provide your safety assessment for User in the above conversation:
         });
 
         themeToggle.addEventListener('click', toggleTheme);
-        aboutToggle.addEventListener('click', openAboutModal);
         settingsToggle.addEventListener('click', () => {
             window.open('settings.html', '_blank');
         });

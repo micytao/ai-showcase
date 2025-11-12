@@ -1243,10 +1243,6 @@
                 <i class="fas fa-cog"></i>
                 Settings
             </button>
-            <button class="header-btn" id="aboutToggle" onclick="openAboutModal()">
-                <i class="fas fa-info-circle"></i>
-                About
-            </button>
             <button class="header-btn" id="themeToggleBtn" onclick="toggleTheme()">
                 <i class="fas fa-moon" id="themeIcon"></i>
                 <span id="themeText">Dark</span>
@@ -1643,56 +1639,6 @@
         </main>
     </div>
 
-    <!-- Modal for About -->
-    <div class="modal-overlay" id="aboutModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>
-                    <i class="fas fa-info-circle"></i>
-                    About This Project
-                </h3>
-                <button class="modal-close" onclick="closeAboutModal()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div style="text-align: center; margin-bottom: 1.5rem;">
-                    <h4 style="color: var(--rh-red); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">Red Hat AI Showcase Demo</h4>
-                    <p style="color: var(--text-secondary); margin: 0; line-height: 1.6; max-width: 450px; margin: 0 auto;">
-                        An interactive platform demonstrating enterprise-ready AI capabilities powered by Red Hat technologies. 
-                        Explore large language models, computer vision, content moderation, and intelligent applications in real-time demonstrations.
-                    </p>
-                </div>
-                
-                <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
-                    <h4 style="color: var(--text-primary); font-size: 1.1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fas fa-user"></i>
-                        Author
-                    </h4>
-                    <div style="display: flex; flex-direction: column; gap: 1rem;">
-                        <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color);">
-                            <img src="../assets/michael.png" alt="Michael Yang" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid var(--rh-red);">
-                            <div style="flex: 1;">
-                                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Michael Yang</div>
-                                <div style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 0.25rem;">Account Solution Architect</div>
-                                <a href="mailto:micyang@redhat.com" style="color: var(--rh-red); font-size: 0.8125rem; text-decoration: none; display: flex; align-items: center; gap: 0.35rem;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
-                                    <i class="fas fa-envelope" style="font-size: 0.75rem;"></i>
-                                    micyang@redhat.com
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div style="text-align: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
-                    <p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0; font-weight: 500;">
-                        Built with ❤️ of AI
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script>
         let currentDemo = null;
 
@@ -1889,18 +1835,6 @@
             updateThemeButton(savedTheme);
         }
 
-
-        // About modal functions
-        function openAboutModal() {
-            const modal = document.getElementById('aboutModal');
-            modal.classList.add('active');
-        }
-
-        function closeAboutModal() {
-            const modal = document.getElementById('aboutModal');
-            modal.classList.remove('active');
-        }
-
         // Filter and search functionality
         let launchableOnly = false;
 
@@ -2072,26 +2006,6 @@
             console.log(`Filtering complete: ${visibleCount} demos visible`);
         }
 
-        // Close modal when clicking outside (on the overlay itself, not children)
-        document.addEventListener('mousedown', (e) => {
-            const aboutModal = document.getElementById('aboutModal');
-            
-            // Only close if clicking directly on the overlay, not its children
-            if (e.target === aboutModal && aboutModal.classList.contains('active')) {
-                closeAboutModal();
-            }
-        });
-
-        // Close modal with Escape key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                const aboutModal = document.getElementById('aboutModal');
-                
-                if (aboutModal.classList.contains('active')) {
-                    closeAboutModal();
-                }
-            }
-        });
 
         // Handle browser back/forward
         window.addEventListener('popstate', (event) => {
@@ -2118,23 +2032,11 @@
             }
         });
 
-        // Prevent modal content clicks from closing the modal
-        function preventModalClose() {
-            const aboutModalContent = document.querySelector('#aboutModal .modal-content');
-            
-            if (aboutModalContent) {
-                aboutModalContent.addEventListener('mousedown', (e) => {
-                    e.stopPropagation();
-                });
-            }
-        }
-
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             initTheme();
             loadVotes();
             sortDemosByVotes();
-            preventModalClose();
             console.log('Red Hat AI Showcase Platform Initialized');
         });
 
