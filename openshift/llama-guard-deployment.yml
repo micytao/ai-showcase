@@ -44,8 +44,7 @@ metadata:
   namespace: llama-guard
 type: Opaque
 stringData:
-#  HF_TOKEN: "YOUR_HUGGINGFACE_TOKEN_HERE"  # Replace with your actual HF token
-  HF_TOKEN: "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"
+  HF_TOKEN: "YOUR_HUGGINGFACE_TOKEN_HERE"  # Replace with your actual HF token
 
 ---
 apiVersion: apps/v1

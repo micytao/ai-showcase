@@ -492,10 +492,55 @@
             </div>
             
             <div style="background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.05)); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 0.5rem; padding: 0.75rem; font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.75rem;">
-                <strong style="color: #f59e0b;">⚡ Detection Info:</strong> Detection boxes show VLM snapshots every 2-3 seconds (not real-time tracking). 
+                <strong style="color: #f59e0b;">⚡ Detection Info:</strong> Detection boxes show VLM snapshots every 2 seconds (not real-time tracking). 
                 <strong style="color: #10b981;">●</strong> <strong>LIVE</strong> = fresh detection, 
                 <strong style="color: #6b7280;">○</strong> <strong>X s ago</strong> = older snapshot. 
                 Movement paths connect detections over time.
+            </div>
+
+            <div style="background: var(--bg-secondary); border-radius: 0.5rem; padding: 1rem; margin-top: 0.75rem; border: 2px solid var(--border-color);">
+                <div class="form-checkbox" style="margin-bottom: 0;">
+                    <input type="checkbox" id="enablePromptEdit">
+                    <label class="form-label" style="margin: 0; font-weight: 600;">
+                        <i class="fas fa-edit"></i>
+                        Enable Prompt Editing
+                    </label>
+                </div>
+
+                <div id="promptEditWrapper" style="display: none; margin-top: 1rem;">
+                    <label class="form-label" style="font-weight: 600;">
+                        <i class="fas fa-comment-dots"></i>
+                        VLM Prompt
+                    </label>
+                    <textarea id="vlmPrompt" class="form-input" rows="8" style="resize: vertical;">Analyze this retail store image and detect all visible people.
+
+Your response must be ONLY a single-line JSON object with this EXACT structure:
+{"count": N, "people": [{"x": P1, "y": P2}, {"x": P3, "y": P4}]}
+
+CRITICAL REQUIREMENTS:
+• NO markdown, NO code blocks, NO ``` symbols
+• NO explanations or extra text - JSON only
+• "x" and "y" are PERCENTAGES from 0 to 100 (NOT pixels)
+• x: 0=left edge, 50=center, 100=right edge
+• y: 0=top edge, 50=middle, 100=bottom edge
+• EVERY person object MUST have BOTH "x" AND "y" keys
+• count must equal the number of objects in people array
+• Use double quotes (") not single quotes (')
+
+EXAMPLES OF CORRECT OUTPUT:
+{"count": 1, "people": [{"x": 50, "y": 50}]}
+{"count": 3, "people": [{"x": 25, "y": 40}, {"x": 60, "y": 55}, {"x": 85, "y": 30}]}
+
+BAD - DO NOT DO THIS:
+```json {...}``` ❌ (no markdown)
+{"count": 2, "people": [{"x": 800, "y": 600}]} ❌ (pixels not percentages)
+{"x": 50, 60} ❌ (missing "y:" label)
+
+Return your JSON response now:</textarea>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                        <i class="fas fa-info-circle"></i> Modify the prompt to change how the VLM analyzes images
+                    </div>
+                </div>
             </div>
 
             <div class="heatmap-container">
@@ -752,6 +797,18 @@
         const heatRadiusInput = document.getElementById('heatRadius');
         const showDetectionsCheck = document.getElementById('showDetections');
         const showPathsCheck = document.getElementById('showPaths');
+        const enablePromptEditCheck = document.getElementById('enablePromptEdit');
+        const promptEditWrapper = document.getElementById('promptEditWrapper');
+        const vlmPromptTextarea = document.getElementById('vlmPrompt');
+
+        // Handle prompt editing checkbox
+        enablePromptEditCheck.addEventListener('change', function() {
+            if (this.checked) {
+                promptEditWrapper.style.display = 'block';
+            } else {
+                promptEditWrapper.style.display = 'none';
+            }
+        });
 
         // Initialize endpoint with default
         function getDefaultAPIEndpoint() {
@@ -998,6 +1055,9 @@
             if (!uploadedVideoFile) return;
             
             console.log('▶️ Playing uploaded video...');
+            
+            // Reset video to beginning
+            videoElement.currentTime = 0;
             
             isRunning = true;
             startBtn.disabled = true;
@@ -1531,7 +1591,7 @@
                 
                 ctx.drawImage(videoElement, 0, 0);
                 
-                const imageData = canvas.toDataURL('image/jpeg', 0.8);
+                const imageData = canvas.toDataURL('image/jpeg', 0.95);
                 
                 // Get endpoint and model
                 const endpoint = baseURL.value.trim();
@@ -1541,6 +1601,9 @@
                 // Create timeout controller (longer timeout for VLM inference)
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout (2 minutes)
+                
+                // Get the prompt (from textarea if editing is enabled, otherwise use default)
+                const promptText = vlmPromptTextarea.value;
                 
                 // Call VLM API
                 const response = await fetch(apiUrl, {
@@ -1555,7 +1618,7 @@
                             content: [
                                 {
                                     type: "text",
-                                    text: "Count people in this image and give their positions as percentages (0-100%). Return ONLY this JSON format with NO extra text: {\"count\": N, \"people\": [{\"x\": 50, \"y\": 30}]}. Example: {\"count\": 3, \"people\": [{\"x\": 25, \"y\": 40}, {\"x\": 60, \"y\": 50}, {\"x\": 80, \"y\": 35}]}"
+                                    text: promptText
                                 },
                                 {
                                     type: "image_url",
@@ -1565,8 +1628,8 @@
                                 }
                             ]
                         }],
-                        max_tokens: 4096,
-                        temperature: 0.3
+                        max_tokens: 8192,
+                        temperature: 0.01
                     })
                 });
                 
@@ -1578,6 +1641,8 @@
 
                 const data = await response.json();
                 const content = data.choices[0].message.content;
+                
+                console.log('📥 Raw VLM response:', content);
                 
                 // Increment frames analyzed counter
                 framesAnalyzedCount++;
@@ -1637,8 +1702,25 @@
                 const codeBlockMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
                 if (codeBlockMatch) {
                     console.log('Found JSON in code block');
-                    data = JSON.parse(codeBlockMatch[1]);
-                } else {
+                    let jsonStr = codeBlockMatch[1];
+                    
+                    // Apply cleaning to code block JSON too
+                    jsonStr = jsonStr
+                        .replace(/,\s*([\]}])/g, '$1')  // Remove trailing commas
+                        .replace(/:\s*'([^']*)'/g, ': "$1"')  // Replace single quotes with double quotes in values
+                        .replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3')  // Fix unquoted keys
+                        .replace(/("x"\s*:\s*\d+\.?\d*),\s*(\d+\.?\d*)\s*\}/g, '$1, "y": $2}');  // Fix missing "y" key
+                    
+                    try {
+                        data = JSON.parse(jsonStr);
+                        console.log('✅ Successfully parsed code block JSON');
+                    } catch (e) {
+                        console.warn('Code block JSON parse failed, falling back to strategy 2:', e);
+                        // Fall through to strategy 2
+                    }
+                }
+                
+                if (!data) {
                     // Strategy 2: Find the first { and last } to extract JSON
                     const firstBrace = content.indexOf('{');
                     const lastBrace = content.lastIndexOf('}');
@@ -1682,11 +1764,118 @@
                         // Clean up common JSON issues
                         let cleanedJson = jsonStr
                             .replace(/,\s*([\]}])/g, '$1')  // Remove trailing commas
-                            .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?\s*:/g, '"$2":')  // Fix unquoted keys
-                            .replace(/:\s*'([^']*)'/g, ': "$1"');  // Replace single quotes with double quotes
+                            .replace(/:\s*'([^']*)'/g, ': "$1"')  // Replace single quotes with double quotes in values
+                            .replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3')  // Fix unquoted keys (only if not already quoted)
+                            .replace(/("x"\s*:\s*\d+\.?\d*),\s*(\d+\.?\d*)\s*\}/g, '$1, "y": $2}');  // Fix missing "y" key: {"x": 310, 40} -> {"x": 310, "y": 40}
                         
                         console.log('Cleaned JSON:', cleanedJson.substring(0, 200) + '...');
-                        data = JSON.parse(cleanedJson);
+                        
+                        // Special case: Fix malformed JSON with multiple "people" keys
+                        // Pattern: {"count": 9, "people": [...], "people": [...], "people": [...]}
+                        if (cleanedJson.includes('"people"') && (cleanedJson.match(/"people"/g) || []).length > 1) {
+                            console.warn('⚠️ Detected multiple "people" keys, attempting to merge...');
+                            
+                            // Extract all coordinate objects from the entire string
+                            const allCoordinates = [];
+                            const coordRegex = /\{\s*"x"\s*:\s*(\d+\.?\d*)\s*,\s*"y"\s*:\s*(\d+\.?\d*)\s*\}/g;
+                            let match;
+                            while ((match = coordRegex.exec(cleanedJson)) !== null) {
+                                allCoordinates.push({
+                                    x: parseFloat(match[1]),
+                                    y: parseFloat(match[2])
+                                });
+                            }
+                            
+                            // Extract count
+                            const countMatch = cleanedJson.match(/"count"\s*:\s*(\d+)/);
+                            const count = countMatch ? parseInt(countMatch[1]) : allCoordinates.length;
+                            
+                            // Rebuild proper JSON
+                            cleanedJson = JSON.stringify({
+                                count: count,
+                                people: allCoordinates
+                            });
+                            
+                            console.log('✅ Merged multiple "people" keys into one array:', allCoordinates.length, 'people');
+                        }
+                        
+                        try {
+                            data = JSON.parse(cleanedJson);
+                        } catch (parseError) {
+                            // If parsing still fails, try more aggressive cleaning
+                            console.warn('First parse attempt failed, trying more aggressive cleaning...');
+                            console.log('Original jsonStr:', jsonStr);
+                            
+                            // More aggressive cleaning for MaaS models
+                            let ultraCleanedJson = jsonStr
+                                // Remove any markdown or extra text
+                                .replace(/```json\s*/g, '')
+                                .replace(/```\s*/g, '')
+                                // Normalize whitespace
+                                .replace(/\s+/g, ' ')
+                                // Fix single quotes to double quotes (but not inside strings)
+                                .replace(/'/g, '"')
+                                // Remove trailing commas
+                                .replace(/,\s*([\]}])/g, '$1')
+                                // Fix unquoted property names (match word characters followed by colon)
+                                .replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3')
+                                // Ensure property names are double-quoted if they somehow got single-quoted
+                                .replace(/([{,]\s*)'([a-zA-Z0-9_]+)'(\s*:)/g, '$1"$2"$3')
+                                // Remove any non-JSON characters at the start and end
+                                .trim();
+                            
+                            console.log('Ultra-cleaned JSON:', ultraCleanedJson);
+                            
+                            try {
+                                data = JSON.parse(ultraCleanedJson);
+                            } catch (parseError2) {
+                                console.warn('Second parse attempt failed, trying manual extraction...');
+                                
+                                // Try to extract just the core data we need
+                                const countMatch = jsonStr.match(/"?count"?\s*:\s*(\d+)/i);
+                                const peopleMatch = jsonStr.match(/"?people"?\s*:\s*(\[[\s\S]*?\](?:\s*\})?)$/i);
+                                
+                                if (countMatch || peopleMatch) {
+                                    // Build a valid JSON from extracted parts
+                                    const count = countMatch ? parseInt(countMatch[1]) : 0;
+                                    let people = [];
+                                    
+                                    if (peopleMatch) {
+                                        try {
+                                            // Extract just the array part, removing any trailing }
+                                            let peopleArrayStr = peopleMatch[1].replace(/\s*\}\s*$/, '');
+                                            
+                                            // Apply the same aggressive cleaning to the people array
+                                            peopleArrayStr = peopleArrayStr
+                                                .replace(/'/g, '"')
+                                                .replace(/,\s*([\]}])/g, '$1')
+                                                .replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3');
+                                            
+                                            console.log('Cleaned people array:', peopleArrayStr);
+                                            people = JSON.parse(peopleArrayStr);
+                                        } catch (e) {
+                                            console.warn('Could not parse people array, trying manual extraction:', e);
+                                            
+                                            // Last resort: extract individual x, y coordinates
+                                            // Match various formats: {x: 50, y: 30}, {'x': 50, 'y': 30}, {x:50,y:30}, etc.
+                                            const coordinateMatches = jsonStr.matchAll(/\{\s*['"']?([xX])['"']?\s*:\s*(\d+\.?\d*)\s*,\s*['"']?([yY])['"']?\s*:\s*(\d+\.?\d*)\s*\}/g);
+                                            for (const match of coordinateMatches) {
+                                                people.push({
+                                                    x: parseFloat(match[2]),
+                                                    y: parseFloat(match[4])
+                                                });
+                                            }
+                                            console.log('Manually extracted people:', people);
+                                        }
+                                    }
+                                    
+                                    data = { count: count, people: people };
+                                    console.log('✅ Extracted data from malformed JSON:', data);
+                                } else {
+                                    throw parseError2; // Re-throw if we can't extract anything useful
+                                }
+                            }
+                        }
                     }
                 }
                 
